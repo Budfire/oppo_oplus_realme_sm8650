@@ -22,7 +22,7 @@ jobs:
       pull-requests: write
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
-      GEMINI_MODEL: 'gemini-4-hydrogen'
+      GEMINI_MODEL: 'gemini-3.8-flash'
       GH_TOKEN: ${{ secrets.PAT_TOKEN }}
     steps:
       - name: Checkout repository
