@@ -330,27 +330,11 @@ jobs:
               cd ..
             else
               echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
-          fi
+            fi
 
             echo "正在为 SukiSU Nova 注入 BakaSU preinit 兼容空函数..."
-            cat << 'EOF' >> ./KernelSU/kernel/ksu.c
-
-          // Compatibility shims for cctv18/susfs4oki v2.4.0+ (BakaSU preinit hooks)
-           #include <linux/fs.h>
-             void __weak ksu_preinit_handle_post_execveat(void) {}
-             void __weak ksu_setup_preinit_file(struct file *file) {} 
-          EOF
-
-          echo "=== Kiểm tra phiên bản SuSFS và file lỗi (.rej) ==="
-          grep -E "SUSFS_VERSION" ./common/include/linux/susfs.h || true
-          REJ_FILES=$(find ./common ./KernelSU -name "*.rej" 2>/dev/null)
-          if [[ -n "$REJ_FILES" ]]; then
-            echo "⚠️ CẢNH BÁO: Có hunk bị vá trượt (.rej):"
-            echo "$REJ_FILES"
-            for rej in $REJ_FILES; do
-              echo "--- Nội dung $rej ---"
-              cat "$rej"
-            done
+            printf '\n// Compatibility shims for cctv18/susfs4oki v2.4.0+\n#include <linux/fs.h>\nvoid __weak ksu_preinit_handle_post_execveat(void) {}\nvoid __weak ksu_setup_preinit_file(struct file *file) {}\n' >> ./KernelSU/kernel/ksu.c
+          fi
           else
             echo "✅ Toàn bộ patch SuSFS áp dụng sạch (0 file .rej)."
 
