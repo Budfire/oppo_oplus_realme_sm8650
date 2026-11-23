@@ -340,9 +340,6 @@ jobs:
              void __weak ksu_preinit_handle_post_execveat(void) {}
              void __weak ksu_setup_preinit_file(struct file *file) {} 
           EOF
-          fi
-          
-          fi
 
           echo "=== Kiểm tra phiên bản SuSFS và file lỗi (.rej) ==="
           grep -E "SUSFS_VERSION" ./common/include/linux/susfs.h || true
@@ -356,7 +353,6 @@ jobs:
             done
           else
             echo "✅ Toàn bộ patch SuSFS áp dụng sạch (0 file .rej)."
-          fi
 
           
       - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
