@@ -42,7 +42,7 @@ jobs:
           settings: |
             {
               "model": {
-                "name": "gemini-4-hydrogen"
+                "name": "gemini-3.8-flash"
               }
             }
           prompt: |
