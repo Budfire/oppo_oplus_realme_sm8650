@@ -328,9 +328,9 @@ jobs:
               cd ./KernelSU
               patch -p1 -F 3 < 10_enable_susfs_for_ksu.patch || true
               cd ..
-            else
-              echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
-            fi
+          else
+            echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
+          fi
 
             echo "正在为 SukiSU Nova 注入 BakaSU preinit 兼容空函数..."
             printf '\n// Compatibility shims for cctv18/susfs4oki v2.4.0+\n#include <linux/fs.h>\nvoid __weak ksu_preinit_handle_post_execveat(void) {}\nvoid __weak ksu_setup_preinit_file(struct file *file) {}\n' >> ./KernelSU/kernel/ksu.c
