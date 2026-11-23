@@ -252,21 +252,21 @@ jobs:
           cd kernel_workspace
           if [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
             echo "正在配置 SukiSU Nova..."
+            BRANCH="main"
             if [[ "${{ github.event.inputs.susfs_enable }}" == "true" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/main/kernel/setup.sh" | bash -s susfs-main
-            else
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/main/kernel/setup.sh" | bash -s main
+              REMOTE_HEADS=$(git ls-remote --heads https://github.com/SukiSU-Nova/SukiSU-Nova.git)
+              if echo "$REMOTE_HEADS" | grep -q "refs/heads/susfs-main"; then
+                BRANCH="susfs-main"
+              elif echo "$REMOTE_HEADS" | grep -q "refs/heads/builtin"; then
+                BRANCH="builtin"
+              fi
             fi
+            echo ">>> Đã chọn nhánh SukiSU Nova: $BRANCH"
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/main/kernel/setup.sh" | bash -s "$BRANCH"
             cd ./KernelSU
+            git fetch --unshallow 2>/dev/null || true
             KSU_VERSION=$(expr $(git rev-list --count HEAD) + 10700 2>/dev/null || echo 114514)
-            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-            echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
-          elif [[ ${{ github.event.inputs.ksu_type }} == "bakasu" ]]; then
-            echo "正在配置 BakaSU..."
-            curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/refs/heads/main/kernel/setup.sh" | bash -s main
-            echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@cctv18"' >> ./common/arch/arm64/configs/gki_defconfig
-            cd ./KernelSU
-            KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 114514)
+            echo ">>> Nhánh thực tế: $(git rev-parse --abbrev-ref HEAD) | KSU_VERSION=$KSU_VERSION"
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
             echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
           elif [[ ${{ github.event.inputs.ksu_type }} == "ksunext" ]]; then
@@ -314,12 +314,39 @@ jobs:
           else
             echo "已选择无内置KernelSU模式，跳过susfs配置..."
           fi
+
           if [[ ${{ github.event.inputs.ksu_type }} == "ksu" ]]; then
             echo "正在为原版 KernelSU (tiann/KernelSU)添加补丁..."
             cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cd ./KernelSU
             patch -p1 -F 3 < 10_enable_susfs_for_ksu.patch || true
+            cd ..
+          elif [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
+            if ! grep -q "config KSU_SUSFS" ./KernelSU/kernel/Kconfig; then
+              echo "⚠️ SukiSU Nova chưa tích hợp sẵn Kconfig SuSFS -> Tự động vá 10_enable_susfs_for_ksu.patch..."
+              cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+              cd ./KernelSU
+              patch -p1 -F 3 < 10_enable_susfs_for_ksu.patch || true
+              cd ..
+            else
+              echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
+            fi
           fi
+
+          echo "=== Kiểm tra phiên bản SuSFS và file lỗi (.rej) ==="
+          grep -E "SUSFS_VERSION" ./common/include/linux/susfs.h || true
+          REJ_FILES=$(find ./common ./KernelSU -name "*.rej" 2>/dev/null)
+          if [[ -n "$REJ_FILES" ]]; then
+            echo "⚠️ CẢNH BÁO: Có hunk bị vá trượt (.rej):"
+            echo "$REJ_FILES"
+            for rej in $REJ_FILES; do
+              echo "--- Nội dung $rej ---"
+              cat "$rej"
+            done
+          else
+            echo "✅ Toàn bộ patch SuSFS áp dụng sạch (0 file .rej)."
+          fi
+
           
       - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
         if: inputs.lz4_enable
@@ -374,6 +401,11 @@ jobs:
           cd kernel_workspace
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           if [[ "${{ github.event.inputs.susfs_enable }}" == "false" ]]; then
+          if [[ "${{ github.event.inputs.kpm_enable }}" == "true" ]]; then
+            # Tắt KPM tích hợp của SukiSU để tránh đụng độ với KPatch-Next (KPN)
+            echo "CONFIG_KPM=n" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+          
             echo "CONFIG_KSU_SUSFS=n" >> ./common/arch/arm64/configs/gki_defconfig
           fi
           #添加对 Mountify (backslashxx/mountify) 模块的支持
@@ -633,7 +665,17 @@ jobs:
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig
+
+          if [[ "${{ github.event.inputs.susfs_enable }}" == "true" && "${{ github.event.inputs.ksu_type }}" != "none" ]]; then
+            echo "=== Kiểm tra cờ KSU & SuSFS thực tế trong out/.config ==="
+            grep -E "CONFIG_KSU(_SUSFS|_KPROBES|_MANUAL_HOOK)?=" out/.config || true
+            if ! grep -q "^CONFIG_KSU_SUSFS=y" out/.config; then
+              echo "❌ LỖI: CONFIG_KSU_SUSFS=y không tồn tại trong out/.config! Dừng biên dịch."
+              exit 1
+            fi
+          fi
+
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
           
           # 编译后时间劫持二次校验
