@@ -321,7 +321,7 @@ jobs:
             cd ./KernelSU
             patch -p1 -F 3 < 10_enable_susfs_for_ksu.patch || true
             cd ..
-          elif [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
+            elif [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
             if ! grep -q "config KSU_SUSFS" ./KernelSU/kernel/Kconfig; then
               echo "⚠️ SukiSU Nova chưa tích hợp sẵn Kconfig SuSFS -> Tự động vá 10_enable_susfs_for_ksu.patch..."
               cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
@@ -331,6 +331,17 @@ jobs:
             else
               echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
             fi
+
+            echo "正在为 SukiSU Nova 注入 BakaSU preinit 兼容空函数..."
+            cat << 'EOF' >> ./KernelSU/kernel/ksu.c
+
+          // Compatibility shims for cctv18/susfs4oki v2.4.0+ (BakaSU preinit hooks)
+           #include <linux/fs.h>
+             void __weak ksu_preinit_handle_post_execveat(void) {}
+             void __weak ksu_setup_preinit_file(struct file *file) {}
+            EOF
+          fi
+          
           fi
 
           echo "=== Kiểm tra phiên bản SuSFS và file lỗi (.rej) ==="
