@@ -330,7 +330,7 @@ jobs:
               cd ..
             else
               echo "✅ Đã phát hiện Kconfig SuSFS tích hợp sẵn trong SukiSU Nova."
-            fi
+          fi
 
             echo "正在为 SukiSU Nova 注入 BakaSU preinit 兼容空函数..."
             cat << 'EOF' >> ./KernelSU/kernel/ksu.c
